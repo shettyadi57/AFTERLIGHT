@@ -17,10 +17,18 @@ interface PlanetMaterialMaps {
   roughnessMap: THREE.Texture;
 }
 
-function buildDerivedPlanetMaps(
+const derivedPlanetMapsCache = new Map<string, { bumpMap: THREE.CanvasTexture; roughnessMap: THREE.CanvasTexture }>();
+
+export function buildDerivedPlanetMaps(
   img: HTMLImageElement,
   planetId: PlanetSphereId
 ): { bumpMap: THREE.CanvasTexture; roughnessMap: THREE.CanvasTexture } {
+  const cacheKey = `${planetId}-${img.src || img.width}`;
+  const existing = derivedPlanetMapsCache.get(cacheKey);
+  if (existing) {
+    return existing;
+  }
+
   const width = 1024;
   const height = 512;
 
@@ -144,7 +152,9 @@ function buildDerivedPlanetMaps(
   roughnessMap.anisotropy = 4;
   roughnessMap.needsUpdate = true;
 
-  return { bumpMap, roughnessMap };
+  const result = { bumpMap, roughnessMap };
+  derivedPlanetMapsCache.set(cacheKey, result);
+  return result;
 }
 
 const MarsAtmosphereLimb: React.FC<{ sunDirection: THREE.Vector3 }> = ({ sunDirection }) => {
@@ -287,7 +297,7 @@ export const PlanetSphere: React.FC<PlanetSphereProps> = ({ planetId }) => {
   const isRotationPaused = useExperienceStore((s) => s.isRotationPaused);
   const reducedMotion = useExperienceStore((s) => s.reducedMotion);
 
-  const segments = graphicsQuality === 'high' ? 128 : graphicsQuality === 'medium' ? 72 : 48;
+  const segments = graphicsQuality === 'high' ? 96 : graphicsQuality === 'medium' ? 64 : 48;
 
   // Primary solar direction: crisp 3/4 side illumination with curved terminator
   const sunDirection = useMemo(
@@ -407,14 +417,12 @@ export const PlanetSphere: React.FC<PlanetSphereProps> = ({ planetId }) => {
       isDraggingRef.current = true;
       lastPointerRef.current = { x: e.clientX, y: e.clientY };
       dragVelocityRef.current = { x: 0, y: 0 };
-      dom.style.cursor = 'grabbing';
     };
 
     const onPointerMove = (e: PointerEvent) => {
       if (!isDraggingRef.current) return;
       if (useExperienceStore.getState().state !== 'DESTINATION_SELECT') {
         isDraggingRef.current = false;
-        dom.style.cursor = '';
         return;
       }
       const dx = e.clientX - lastPointerRef.current.x;
@@ -437,7 +445,6 @@ export const PlanetSphere: React.FC<PlanetSphereProps> = ({ planetId }) => {
     const onPointerUp = () => {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
-      dom.style.cursor = '';
     };
 
     dom.addEventListener('pointerdown', onPointerDown);
@@ -448,7 +455,6 @@ export const PlanetSphere: React.FC<PlanetSphereProps> = ({ planetId }) => {
       dom.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
-      dom.style.cursor = '';
     };
   }, [gl]);
 

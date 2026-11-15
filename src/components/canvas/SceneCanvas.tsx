@@ -10,6 +10,7 @@ import { PlanetSphere } from './PlanetSphere';
 export const SceneCanvas: React.FC = () => {
   const state = useExperienceStore((s) => s.state);
   const currentDestination = useExperienceStore((s) => s.currentDestination);
+  const isArrivalHeroVisible = useExperienceStore((s) => s.isArrivalHeroVisible);
 
   // During ARRIVAL, render the photorealistic lunar arrival landscape with rising Earth
   const activeEnvironment =
@@ -21,12 +22,13 @@ export const SceneCanvas: React.FC = () => {
     (state === 'DESTINATION_SELECT' || state === 'ENVIRONMENT_LOADING') &&
     (activeEnvironment === 'moon' || activeEnvironment === 'mars');
 
-  // Museum exhibition & detail screens render dedicated photography/models over #080B10
+  // Museum exhibition, detail screens & dedicated 3D planetary archaeology render dedicated views
   const isMuseumEditorialView =
     state === 'EXHIBITION' ||
     state === 'ARTIFACT_DETAILS' ||
     state === 'STORY_CHAPTER' ||
-    state === 'LEGACY';
+    state === 'LEGACY' ||
+    state === 'PLANETARY_ARCHAEOLOGY';
 
   if (isMuseumEditorialView) {
     return <div className="absolute inset-0 w-full h-full z-0 bg-[#080B10]" />;
@@ -35,6 +37,7 @@ export const SceneCanvas: React.FC = () => {
   return (
     <div className="absolute inset-0 w-full h-full pointer-events-auto z-0 overflow-hidden bg-[#000000]">
       <Canvas
+        frameloop={state === 'ARRIVAL' && !isArrivalHeroVisible ? 'demand' : 'always'}
         shadows
         gl={{
           antialias: true,
@@ -44,7 +47,7 @@ export const SceneCanvas: React.FC = () => {
           depth: true,
           toneMappingExposure: 1.0,
         }}
-        dpr={[1, Math.min(2, window.devicePixelRatio)]}
+        dpr={[1, Math.min(1.5, window.devicePixelRatio)]}
         camera={{ position: [0, 2.5, 12], fov: 42, near: 0.1, far: 400 }}
       >
         <CameraDirector />

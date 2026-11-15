@@ -33,12 +33,17 @@ interface ExperienceStore {
   reducedMotion: boolean;
   isRotationPaused: boolean;
   isAiGuideOpen: boolean;
+  unitSystem: 'metric' | 'imperial';
+  isTeacherModeOpen: boolean;
+  isLowBandwidthMode: boolean;
+  webglAvailable: boolean;
 
   // Progress tracking
   discoveredArtifacts: string[];
 
   // Actions
   setState: (state: ExperienceState) => void;
+  setArrivalHeroVisible: (visible: boolean) => void;
   beginArrival: () => void;
   previewDestination: (destId: DestinationId) => void;
   selectDestination: (destId: DestinationId) => void;
@@ -55,6 +60,7 @@ interface ExperienceStore {
   returnToExhibition: () => void;
   returnToExploration: () => void;
   returnToDestinations: () => void;
+  enterPlanetaryArchaeology: () => void;
   setExhibitionView: (view: 'collection' | 'map') => void;
   navigateBack: () => void;
   setCameraAnimating: (isAnimating: boolean) => void;
@@ -67,9 +73,13 @@ interface ExperienceStore {
   setReducedMotion: (reduced: boolean) => void;
   toggleRotationPaused: () => void;
   toggleAiGuide: (open?: boolean) => void;
+  toggleUnitSystem: () => void;
+  toggleTeacherMode: (open?: boolean) => void;
+  toggleLowBandwidthMode: (enabled?: boolean) => void;
+  setWebglAvailable: (available: boolean) => void;
 }
 
-// Initial state resolution with strict destination narrowing (Moon & Mars only)
+// Initial state resolution with URL query synchronization & planetary module support
 const getInitialFromUrl = (): {
   state: ExperienceState;
   dest: DestinationId;
@@ -80,9 +90,14 @@ const getInitialFromUrl = (): {
   if (typeof window === 'undefined') {
     return { state: 'ARRIVAL', dest: 'moon', artifact: null, chapter: 0, view: 'collection' };
   }
+  const params = new URLSearchParams(window.location.search);
+  const rawState = params.get('state');
+  const moduleParam = params.get('module');
+  const isPlanetary3D = moduleParam === 'planetary3d' || rawState === 'PLANETARY_ARCHAEOLOGY';
   const parsed = navigation.parseUrl(window.location.search);
+
   return {
-    state: parsed.state,
+    state: isPlanetary3D ? 'PLANETARY_ARCHAEOLOGY' : parsed.state,
     dest: parsed.destination,
     artifact: parsed.artifactId,
     chapter: parsed.storyChapterIndex,
@@ -116,10 +131,19 @@ export const useExperienceStore = create<ExperienceStore>((set, get) => ({
   reducedMotion: initialReducedMotion,
   isRotationPaused: false,
   isAiGuideOpen: false,
+  unitSystem: 'metric',
+  isTeacherModeOpen: false,
+  isLowBandwidthMode: false,
+  webglAvailable: true,
 
   discoveredArtifacts: initial.artifact ? [initial.artifact] : [],
 
   setState: (state) => set({ state }),
+  setArrivalHeroVisible: (visible) => {
+    if (get().isArrivalHeroVisible !== visible) {
+      set({ isArrivalHeroVisible: visible });
+    }
+  },
 
   beginArrival: () => {
     navigation.toDestinations();
@@ -221,6 +245,16 @@ export const useExperienceStore = create<ExperienceStore>((set, get) => ({
     navigation.goBack();
   },
 
+  enterPlanetaryArchaeology: () => {
+    soundManager.playTransitionSwoosh();
+    set({
+      state: 'PLANETARY_ARCHAEOLOGY',
+      selectedArtifactId: null,
+      selectedComponentId: null,
+      hoveredArtifactId: null,
+    });
+  },
+
   setCameraAnimating: (isAnimating) => set({ isCameraAnimating: isAnimating }),
 
   toggleAudio: () => {
@@ -268,6 +302,22 @@ export const useExperienceStore = create<ExperienceStore>((set, get) => ({
       soundManager.playNavModalClose();
     }
     set({ isAiGuideOpen: next });
+  },
+
+  toggleUnitSystem: () => {
+    set((state) => ({ unitSystem: state.unitSystem === 'metric' ? 'imperial' : 'metric' }));
+  },
+
+  toggleTeacherMode: (open) => {
+    set((state) => ({ isTeacherModeOpen: open !== undefined ? open : !state.isTeacherModeOpen }));
+  },
+
+  toggleLowBandwidthMode: (enabled) => {
+    set((state) => ({ isLowBandwidthMode: enabled !== undefined ? enabled : !state.isLowBandwidthMode }));
+  },
+
+  setWebglAvailable: (available) => {
+    set({ webglAvailable: available });
   },
 }));
 
